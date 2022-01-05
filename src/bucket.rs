@@ -1,13 +1,9 @@
-use std::cmp::Ordering;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct BucketConfig {
     /// The name of the bucket.
     pub name: String,
     /// The bucket key
     pub key: String,
-    /// A path
-    pub full_path: Option<String>,
 }
 
 impl BucketConfig {
@@ -17,7 +13,7 @@ impl BucketConfig {
     ///
     ///   use s3_fs::bucket::BucketConfig;
     ///   let bucket_config = BucketConfig::from_path("s3://bucket/key");
-    ///   assert_eq!(bucket_config, BucketConfig{name: "bucket".to_string(), key: "key/".to_string(), full_path: Option::from("key/".to_string())})
+    ///   assert_eq!(bucket_config, BucketConfig{name: "bucket".to_string(), key: "key".to_string()})
     ///
     ///```
     ///
@@ -25,15 +21,11 @@ impl BucketConfig {
     ///
     ///  Panics if the bucket name is not valid.
     pub fn from_path<P: ToString>(path: P) -> Self {
-        let (name, key, full_path) = Self::split_path(path.to_string());
-        BucketConfig {
-            name,
-            key,
-            full_path,
-        }
+        let (name, key) = Self::split_path(path.to_string());
+        BucketConfig { name, key }
     }
 
-    fn split_path(path: String) -> (String, String, Option<String>) {
+    fn split_path(path: String) -> (String, String) {
         let path = path
             .replace("s3://", "")
             .replace(":accesspoint/", ":accesspoint:");
@@ -47,22 +39,8 @@ impl BucketConfig {
             panic!("{} is not a valid bucket name.", bucket)
         }
 
-        let mut key = String::new();
-        let mut full_path = Option::None;
+        let key = parts[1..].join("/");
 
-        match parts.len().cmp(&2) {
-            Ordering::Less => {}
-            Ordering::Equal => {
-                let other = format!("{}/", parts[1]);
-                key.push_str(&other);
-                full_path = Option::Some(other);
-            }
-            Ordering::Greater => {
-                key.push_str(&format!("{}/", parts[1]));
-                full_path = Option::Some(format!("{}/", parts[1..].join("/")));
-            }
-        }
-
-        (bucket.to_string(), key.to_string(), full_path)
+        (bucket.to_string(), key)
     }
 }
