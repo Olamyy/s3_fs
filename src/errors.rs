@@ -1,4 +1,5 @@
 use rusoto_core::RusotoError;
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub enum S3PathError {
@@ -7,10 +8,12 @@ pub enum S3PathError {
     ObjectDoesNotExist,
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug)]
 pub enum S3PathOp {
     HeadObject,
-    ListObjects,
+    GetObject,
+    PutObject,
 }
 
 impl std::error::Error for S3PathError {
@@ -39,17 +42,17 @@ impl std::fmt::Display for S3PathError {
     }
 }
 
-pub fn process_error<E>(e: RusotoError<E>, op: S3PathOp) {
+pub fn process_error<E: Debug>(e: RusotoError<E>, op: S3PathOp) {
     match e {
         RusotoError::Unknown(e) => match e.status.as_str() {
             "400" => panic!("{}", S3PathError::ExpiredToken),
-            "404" => {
+            "404" | "301" => {
                 if let S3PathOp::HeadObject = op {
                     panic!("{}", S3PathError::ObjectDoesNotExist)
                 }
             }
-            _ => panic!("{}", S3PathError::Unknown),
+            _ => panic!("{} : {:?}", S3PathError::Unknown, e),
         },
-        _ => panic!("Something else happened"),
+        _ => panic!("{:?}", e),
     }
 }
