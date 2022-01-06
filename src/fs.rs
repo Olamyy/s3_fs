@@ -54,7 +54,7 @@ impl FS {
         Ok(dir_name.to_string())
     }
 
-    fn ensure_paths_exists(path: &S3Path) -> anyhow::Result<bool, S3PathError> {
+    fn ensure_paths_exists(path: &S3Path) -> Result<bool, S3PathError> {
         path.try_exists()
     }
 }
