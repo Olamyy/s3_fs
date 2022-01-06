@@ -1,5 +1,5 @@
 use crate::bucket::BucketConfig;
-use crate::errors::{process_error, S3PathOp};
+use crate::errors::{process_error, S3PathError, S3PathOp};
 use crate::object::ObjectMetadata;
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{
@@ -137,44 +137,29 @@ impl S3Service {
         body: Option<StreamingBody>,
         path: P,
         metadata: Option<HashMap<String, String>>,
-    ) -> Result<PutObjectOutput, ()> {
-        let result = self.put_object(content_length, body, path, metadata);
-        match result {
-            Ok(put_object_result) => Ok(put_object_result),
-            Err(e) => {
-                process_error(e, S3PathOp::PutObject);
-                Err(())
-            }
+    ) -> Result<PutObjectOutput, S3PathError> {
+        match self.put_object(content_length, body, path, metadata) {
+            Ok(result) => Ok(result),
+            Err(e) => Err(process_error(Some(e), None, S3PathOp::PutObject)),
         }
     }
 
-    pub fn ensure_object_exists(&self) -> Result<bool, ()> {
-        let does_object_exists = self.object_exists();
-
-        match does_object_exists {
-            Ok(_) => {}
-            Err(e) => process_error(e, S3PathOp::HeadObject),
-        }
-
-        Ok(true)
-    }
-
-    pub fn get_object_body(&self) -> Result<Option<StreamingBody>, ()> {
-        let s3_object = self.get_object();
-
-        match s3_object {
-            Ok(object) => Ok(object.body),
-            Err(e) => {
-                process_error(e, S3PathOp::GetObject);
-                Err(())
-            }
+    pub fn ensure_object_exists(&self) -> Result<bool, S3PathError> {
+        match self.object_exists() {
+            Ok(_) => Ok(true),
+            Err(e) => Err(process_error(Some(e), None, S3PathOp::HeadObject)),
         }
     }
 
-    pub fn get_object_metadata(&self) -> Result<ObjectMetadata, ()> {
-        let s3_object = self.get_object();
+    pub fn get_object_body(&self) -> Result<Option<StreamingBody>, S3PathError> {
+        match self.get_object() {
+            Ok(body) => Ok(body.body),
+            Err(e) => Err(process_error(Some(e), None, S3PathOp::GetObject)),
+        }
+    }
 
-        match s3_object {
+    pub fn get_object_metadata(&self) -> Result<ObjectMetadata, S3PathError> {
+        match self.get_object() {
             Ok(object) => Ok(ObjectMetadata {
                 content_type: object.content_type.unwrap(),
                 content_length: object.content_length,
@@ -182,10 +167,7 @@ impl S3Service {
                 last_modified: object.last_modified.unwrap(),
                 metadata: object.metadata,
             }),
-            Err(e) => {
-                process_error(e, S3PathOp::GetObject);
-                Err(())
-            }
+            Err(e) => Err(process_error(Some(e), None, S3PathOp::GetObject)),
         }
     }
 }

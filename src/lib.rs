@@ -1,5 +1,5 @@
 pub mod bucket;
-mod errors;
+pub mod errors;
 pub mod fs;
 mod object;
 pub mod s3;
