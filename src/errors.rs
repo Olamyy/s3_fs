@@ -1,11 +1,12 @@
 use rusoto_core::RusotoError;
 use std::fmt::Debug;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum S3PathError {
     Unknown,
     ExpiredToken,
     ObjectDoesNotExist,
+    ObjectAlreadyExists,
 }
 
 #[allow(clippy::enum_variant_names)]
@@ -22,6 +23,7 @@ impl std::error::Error for S3PathError {
             S3PathError::Unknown => None,
             S3PathError::ExpiredToken => None,
             S3PathError::ObjectDoesNotExist => None,
+            S3PathError::ObjectAlreadyExists => None,
         }
     }
 }
@@ -38,21 +40,34 @@ impl std::fmt::Display for S3PathError {
             S3PathError::ObjectDoesNotExist => {
                 write!(f, "No such file or directory.")
             }
+            S3PathError::ObjectAlreadyExists => {
+                write!(f, "The file/folder already exists.")
+            }
         }
     }
 }
 
-pub fn process_error<E: Debug>(e: RusotoError<E>, op: S3PathOp) {
+pub fn process_error<E: Debug>(
+    e: Option<RusotoError<E>>,
+    s3_path_error: Option<S3PathError>,
+    op: S3PathOp,
+) -> S3PathError {
     match e {
-        RusotoError::Unknown(e) => match e.status.as_str() {
-            "400" => panic!("{}", S3PathError::ExpiredToken),
-            "404" | "301" => {
-                if let S3PathOp::HeadObject = op {
-                    panic!("{}", S3PathError::ObjectDoesNotExist)
+        None => s3_path_error.unwrap(),
+        Some(rusoto_error) => match rusoto_error {
+            RusotoError::Service(_) => S3PathError::Unknown,
+            RusotoError::Unknown(error) => match error.status.as_str() {
+                "400" => S3PathError::ExpiredToken,
+                "404" | "301" => {
+                    if let S3PathOp::HeadObject = op {
+                        S3PathError::ObjectDoesNotExist
+                    } else {
+                        S3PathError::Unknown
+                    }
                 }
-            }
-            _ => panic!("{} : {:?}", S3PathError::Unknown, e),
+                _ => S3PathError::Unknown,
+            },
+            _ => S3PathError::Unknown,
         },
-        _ => panic!("{:?}", e),
     }
 }

@@ -1,4 +1,5 @@
 use crate::bucket::BucketConfig;
+use crate::errors::S3PathError;
 use crate::object::{ObjectMetadata, S3ObjectType};
 use crate::services::S3Service;
 use rusoto_s3::S3Client;
@@ -102,7 +103,7 @@ impl S3Path {
     ///
     ///
     #[allow(clippy::result_unit_err)]
-    pub fn try_exists(&self) -> Result<bool, ()> {
+    pub fn try_exists(&self) -> Result<bool, S3PathError> {
         self.service.ensure_object_exists()
     }
 
@@ -147,11 +148,8 @@ impl S3Path {
     ///   s3_path.metadata();
     ///
     ///```
-    pub fn metadata(&self) -> Option<ObjectMetadata> {
-        match self.exists() {
-            true => Some(self.service.get_object_metadata().unwrap()),
-            false => None,
-        }
+    pub fn metadata(&self) -> Result<ObjectMetadata, S3PathError> {
+        self.service.get_object_metadata()
     }
 
     fn validate_path(path: &Path) {

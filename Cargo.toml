@@ -9,8 +9,6 @@ edition = "2021"
 rusoto_core = "0.47.0"
 rusoto_s3 = "0.47.0"
 tokio = {version = "1.15.0", features = ["full"] }
-thiserror = "1.0.30"
-rand = "0.8.4"
 
 [lib]
 name = "s3_fs"
