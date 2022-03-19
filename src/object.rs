@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use crate::errors::S3PathError;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum S3ObjectType {
@@ -13,15 +14,7 @@ pub struct ObjectMetadata {
     pub e_tag: String,
     pub last_modified: String,
     pub metadata: Option<HashMap<String, String>>,
-}
-
-impl ObjectMetadata {
-    pub fn content_type(&self) -> S3ObjectType {
-        match self.content_type.contains("application/x-directory") {
-            true => S3ObjectType::Directory,
-            false => S3ObjectType::File,
-        }
-    }
+    pub object_type: S3ObjectType
 }
 
 impl Debug for ObjectMetadata {

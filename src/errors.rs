@@ -7,6 +7,7 @@ pub enum S3PathError {
     ExpiredToken,
     ObjectDoesNotExist,
     ObjectAlreadyExists,
+    NotADirectory,
 }
 
 #[allow(clippy::enum_variant_names)]
@@ -15,6 +16,7 @@ pub enum S3PathOp {
     HeadObject,
     GetObject,
     PutObject,
+    ListObjects,
 }
 
 impl std::error::Error for S3PathError {
@@ -24,6 +26,7 @@ impl std::error::Error for S3PathError {
             S3PathError::ExpiredToken => None,
             S3PathError::ObjectDoesNotExist => None,
             S3PathError::ObjectAlreadyExists => None,
+            S3PathError::NotADirectory => None,
         }
     }
 }
@@ -42,6 +45,9 @@ impl std::fmt::Display for S3PathError {
             }
             S3PathError::ObjectAlreadyExists => {
                 write!(f, "The file/folder already exists.")
+            }
+            S3PathError::NotADirectory => {
+                write!(f, "The provided path is not a directory")
             }
         }
     }

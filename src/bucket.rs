@@ -35,11 +35,16 @@ impl BucketConfig {
             .collect::<Vec<&str>>();
 
         let bucket = parts[0];
+
         if bucket.contains('/') {
             panic!("{} is not a valid bucket name.", bucket)
         }
 
-        let key = parts[1..].join("/");
+        let mut key = parts[1..].join("/");
+
+        if !key.contains(".") {
+            key = format!("{}/", key);
+        }
 
         (bucket.to_string(), key)
     }

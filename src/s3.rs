@@ -10,7 +10,7 @@ pub struct S3Path {
     /// A `PathBuf` object representing the path.
     pub path: PathBuf,
     /// A [ObjectContent] representation of the content of the path.
-    service: S3Service,
+    pub service: S3Service,
 }
 
 impl Debug for S3Path {
@@ -102,7 +102,6 @@ impl S3Path {
     /// Panics if the object does not exist
     ///
     ///
-    #[allow(clippy::result_unit_err)]
     pub fn try_exists(&self) -> Result<bool, S3PathError> {
         self.service.ensure_object_exists()
     }
@@ -120,7 +119,7 @@ impl S3Path {
         match self.exists() {
             true => {
                 let metadata = self.service.get_object_metadata().unwrap();
-                metadata.content_type() == S3ObjectType::Directory
+                metadata.object_type == S3ObjectType::Directory
             }
             false => false,
         }
@@ -175,5 +174,11 @@ impl S3Path {
             }
             path
         }
+    }
+}
+
+impl ToString for S3Path {
+    fn to_string(&self) -> String {
+        self.path.to_str().unwrap().to_string()
     }
 }

@@ -1,14 +1,17 @@
 use crate::bucket::BucketConfig;
 use crate::errors::{process_error, S3PathError, S3PathOp};
-use crate::object::ObjectMetadata;
+use crate::object::{ObjectMetadata, S3ObjectType};
 use rusoto_core::{Region, RusotoError};
 use rusoto_s3::{
-    GetObjectError, GetObjectOutput, GetObjectRequest, HeadObjectError, HeadObjectOutput,
-    HeadObjectRequest, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client, StreamingBody,
-    S3,
+    CommonPrefix, GetObjectError, GetObjectOutput, GetObjectRequest, HeadObjectError,
+    HeadObjectOutput, HeadObjectRequest, ListObjectsError, ListObjectsV2Error, ListObjectsV2Output,
+    ListObjectsV2Request, Object, PutObjectError, PutObjectOutput, PutObjectRequest, S3Client,
+    StreamingBody, S3,
 };
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::hash::Hasher;
+use crate::fs::metadata;
 
 pub struct S3Service {
     pub bucket: BucketConfig,
@@ -160,14 +163,74 @@ impl S3Service {
 
     pub fn get_object_metadata(&self) -> Result<ObjectMetadata, S3PathError> {
         match self.get_object() {
-            Ok(object) => Ok(ObjectMetadata {
-                content_type: object.content_type.unwrap(),
-                content_length: object.content_length,
-                e_tag: object.e_tag.unwrap(),
-                last_modified: object.last_modified.unwrap(),
-                metadata: object.metadata,
-            }),
+            Ok(object) => {
+                let file_type = match self.bucket.key.contains(".") {
+                    true => S3ObjectType::File,
+                    false => S3ObjectType::Directory,
+                };
+                let metadata = ObjectMetadata {
+                    content_type: object.content_type.unwrap(),
+                    content_length: object.content_length,
+                    e_tag: object.e_tag.unwrap(),
+                    last_modified: object.last_modified.unwrap(),
+                    metadata: object.metadata,
+                    object_type: file_type
+                };
+
+                Ok(metadata)
+            },
             Err(e) => Err(process_error(Some(e), None, S3PathOp::GetObject)),
         }
+    }
+
+    #[tokio::main]
+    pub async fn list_objects(
+        &self,
+    ) -> Result<(Vec<Object>, Vec<CommonPrefix>, String), S3PathError> {
+        let mut objects = vec![];
+        let mut common_prefixes = vec![];
+        let mut prefix = String::new();
+
+        let mut list_object_input = ListObjectsV2Request {
+            bucket: self.bucket.name.to_string(),
+            continuation_token: None,
+            delimiter: Option::Some("/".to_string()),
+            encoding_type: None,
+            expected_bucket_owner: None,
+            fetch_owner: None,
+            max_keys: None,
+            prefix: Some(self.bucket.key.to_string()),
+            request_payer: None,
+            start_after: None,
+        };
+
+        loop {
+            let result = self.client.list_objects_v2(list_object_input.clone()).await;
+
+            match result {
+                Ok(list_objects_output) => {
+                    if let Some(contents) = list_objects_output.contents {
+                        objects.extend(contents);
+                    }
+
+                    let bucket_prefix = list_objects_output.prefix.unwrap();
+                    prefix.push_str(bucket_prefix.as_str().split_at(bucket_prefix.len() - 1).0);
+
+                    if let Some(prefixes) = list_objects_output.common_prefixes {
+                        common_prefixes.extend(prefixes);
+                    }
+
+                    if list_objects_output.next_continuation_token.is_none() {
+                        break;
+                    } else {
+                        list_object_input.continuation_token =
+                            list_objects_output.continuation_token;
+                    }
+                }
+                Err(_) => {},
+            }
+        }
+
+        Ok((objects, common_prefixes, prefix))
     }
 }
